@@ -1,0 +1,11 @@
+# Deployment Configuration
+conf_threshold: 0.25
+iou_threshold: 0.45
+imgsz: 640
+device: 'cpu'  # or 0
+save_txt: true
+save_conf: true
+save_json: true
+show_labels: true
+show_conf: true
+line_width: 3

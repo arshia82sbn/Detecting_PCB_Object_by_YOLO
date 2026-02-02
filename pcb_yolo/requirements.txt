@@ -1,0 +1,12 @@
+ultralytics>=8.3.0
+albumentations>=1.4.0
+opencv-python
+pyyaml
+python-dotenv
+pandas
+matplotlib
+tqdm
+torch
+torchvision
+roboflow
+supervision

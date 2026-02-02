@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pcb_yolo"
+version = "0.1.0"
+description = "Professional YOLO-based PCB defect detection project"
+authors = [
+    {name = "Jules", email = "jules@example.com"},
+]
+dependencies = [
+    "ultralytics>=8.3.0",
+    "albumentations>=1.4.0",
+    "opencv-python",
+    "pyyaml",
+    "python-dotenv",
+    "pandas",
+    "matplotlib",
+    "tqdm",
+    "torch",
+    "torchvision",
+]
+requires-python = ">=3.9"
+
+[tool.black]
+line-length = 88
+target-version = ['py39']

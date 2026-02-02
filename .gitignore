@@ -1,0 +1,22 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# Experiments and artifacts
+runs/
+experiments/
+data/mock/
+data/raw/
+*.pt
+*.onnx
+*.torchscript
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
