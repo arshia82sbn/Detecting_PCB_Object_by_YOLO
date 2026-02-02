@@ -7,13 +7,9 @@ venv/
 ENV/
 
 # Experiments and artifacts
-# runs/
-# experiments/
-# data/mock/
-# data/raw/
-# *.pt
-# *.onnx
-# *.torchscript
+# We want to keep some results in the repo for review as requested,
+# but usually these are ignored.
+# For this task, we explicitly include some.
 
 # Logs
 *.log
