@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
+
 def calculate_iou(box1, box2):
     """
     Calculate Intersection over Union (IoU) of two bounding boxes.
@@ -19,6 +20,7 @@ def calculate_iou(box1, box2):
 
     return intersection / union if union > 0 else 0
 
+
 def compute_ap(recall, precision):
     """
     Compute Average Precision (AP) using the 11-point interpolation.
@@ -29,11 +31,12 @@ def compute_ap(recall, precision):
 
     x = np.linspace(0, 1, 11)
     # np.trapz was renamed to np.trapezoid in NumPy 2.0
-    if hasattr(np, 'trapezoid'):
+    if hasattr(np, "trapezoid"):
         ap = np.trapezoid(np.interp(x, mrec, mpre), x)
     else:
         ap = np.trapz(np.interp(x, mrec, mpre), x)
     return ap
+
 
 def compute_f1(precision, recall):
     """
@@ -41,15 +44,16 @@ def compute_f1(precision, recall):
     """
     return 2 * (precision * recall) / (precision + recall + 1e-16)
 
+
 def plot_pr_curve(precision, recall, ap, save_path):
     """
     Plot and save Precision-Recall curve for publication.
     """
     plt.figure(figsize=(8, 6))
-    plt.plot(recall, precision, label=f'mAP@0.5 = {ap:.3f}')
-    plt.xlabel('Recall')
-    plt.ylabel('Precision')
-    plt.title('Precision-Recall Curve')
+    plt.plot(recall, precision, label=f"mAP@0.5 = {ap:.3f}")
+    plt.xlabel("Recall")
+    plt.ylabel("Precision")
+    plt.title("Precision-Recall Curve")
     plt.legend()
     plt.grid(True)
     plt.savefig(save_path)
