@@ -1,0 +1,4 @@
+# YOLO Model Configuration
+model_type: yolov8s.pt  # or yolo11s.pt
+task: detect
+imgsz: 640

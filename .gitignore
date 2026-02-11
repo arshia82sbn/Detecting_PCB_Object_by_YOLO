@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# Experiments and artifacts
+# We want to keep some results in the repo for review as requested,
+# but usually these are ignored.
+# For this task, we explicitly include some.
+
+# Logs
+*.log
+
+# OS files
+.DS_Store

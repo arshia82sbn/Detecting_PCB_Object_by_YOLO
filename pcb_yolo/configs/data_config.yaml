@@ -1,0 +1,8 @@
+# Dataset Configuration
+train: data/train/images
+val: data/val/images
+test: data/test/images
+
+# Classes
+nc: 6
+names: ['missing_hole', 'mouse_bite', 'open_circuit', 'short', 'spur', 'spurious_copper']
