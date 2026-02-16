@@ -1,11 +1,12 @@
 import argparse
 import os
 import random
+from pathlib import Path
+
 import numpy as np
 import torch
-from src.pipeline.train_pipeline import TrainPipeline
+
 from src.utils.logger import logger
-from src.utils.helpers import load_yaml
 
 
 def set_global_seeds(seed: int):
@@ -16,6 +17,24 @@ def set_global_seeds(seed: int):
     os.environ["PYTHONHASHSEED"] = str(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+
+def resolve_config_path(path: str) -> str:
+    """Resolve config paths from either repo root or package root.
+
+    This supports running the CLI from the repository root where configs live
+    under ``pcb_yolo/configs`` as well as from inside the ``pcb_yolo`` folder.
+    """
+    input_path = Path(path)
+    if input_path.exists():
+        return str(input_path)
+
+    package_root = Path(__file__).resolve().parents[1]
+    fallback_path = package_root / input_path
+    if fallback_path.exists():
+        return str(fallback_path)
+
+    return path
 
 
 def main():
@@ -43,7 +62,15 @@ def main():
 
     args = parser.parse_args()
 
+    args.config = resolve_config_path(args.config)
+    args.data = resolve_config_path(args.data)
+    args.model = resolve_config_path(args.model)
+
     set_global_seeds(args.seed)
+
+    # Defer heavy imports until CLI args are parsed so `--help` works even when
+    # optional runtime deps (e.g., OpenCV system libs) are unavailable.
+    from src.pipeline.train_pipeline import TrainPipeline
 
     pipeline = TrainPipeline(args.data, args.model, args.config)
 

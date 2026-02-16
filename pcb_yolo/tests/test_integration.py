@@ -17,7 +17,7 @@ def setup_test_env():
     os.chdir(orig_dir)
 
 def create_mock_data_for_test():
-    import cv2
+    cv2 = pytest.importorskip("cv2", reason="OpenCV runtime (libGL) not available", exc_type=ImportError)
     import numpy as np
     base = "data/mock"
     for split in ['train', 'val', 'test']:
@@ -45,6 +45,7 @@ def test_full_pipeline_smoke():
     """
     Test the full pipeline: Prepare -> Train -> Export -> Infer
     """
+    pytest.importorskip("cv2", reason="OpenCV runtime (libGL) not available", exc_type=ImportError)
     create_mock_data_for_test()
     # 1. Prepare
     assert os.path.exists("configs/data_config.yaml")

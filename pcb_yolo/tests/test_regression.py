@@ -1,30 +1,47 @@
-import pytest
 from src.models.yolo_model import YOLOModel
-from src.models.trainer import PCBYOLOTrainer
-import os
 
-def test_yolo_model_train_data_override():
+
+class _DummyYOLO:
+    def __init__(self):
+        self.train_call = None
+
+    def train(self, **kwargs):
+        self.train_call = kwargs
+        return {"ok": True}
+
+
+def test_yolo_model_train_data_override(monkeypatch):
     """
     Regression test: Ensure 'data' in train_config doesn't cause TypeError.
     """
-    model_cfg = {'model_type': 'yolov8n.pt'}
+    monkeypatch.setattr(YOLOModel, "_load_yolo", staticmethod(lambda _: _DummyYOLO()))
+
+    model_cfg = {"model_type": "yolov8n.pt"}
     model = YOLOModel(model_cfg)
 
-    # We won't actually call train() because it needs a real dataset,
-    # but we can check if the data override logic in YOLOModel.train is sound.
-    # Actually, let's just verify the file content or mock it.
-    pass
+    train_cfg = {"epochs": 1, "data": "should_be_removed"}
+    result = model.train("dataset.yaml", train_cfg)
 
-def test_trainer_accumulate_argument():
-    """
-    Regression test: Ensure 'accumulate' is NOT passed to YOLO train.
-    """
-    # This is handled in PCBYOLOTrainer.run_training
-    pass
+    assert result == {"ok": True}
+    assert model.model.train_call == {"data": "dataset.yaml", "epochs": 1}
 
-def test_absolute_path_registration():
+
+def test_load_weights_replaces_model(monkeypatch):
     """
-    Regression test: Ensure model is registered even if project path is relative.
+    Regression test: Ensure `load_weights` swaps model instance.
     """
-    # This was fixed by os.path.abspath(project) in trainer.py
-    pass
+
+    created = []
+
+    def _factory(weight_name):
+        obj = {"weights": weight_name}
+        created.append(obj)
+        return obj
+
+    monkeypatch.setattr(YOLOModel, "_load_yolo", staticmethod(_factory))
+
+    model = YOLOModel({"model_type": "first.pt"})
+    model.load_weights("second.pt")
+
+    assert created[0]["weights"] == "first.pt"
+    assert model.model["weights"] == "second.pt"
