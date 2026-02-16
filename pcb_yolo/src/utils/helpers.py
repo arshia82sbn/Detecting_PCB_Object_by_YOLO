@@ -1,8 +1,13 @@
-import yaml
 import json
 import os
-import cv2
+
 import matplotlib.pyplot as plt
+import yaml
+
+try:
+    import cv2
+except ImportError:  # pragma: no cover - environment specific
+    cv2 = None
 
 
 def load_yaml(filepath):
@@ -25,7 +30,16 @@ def save_json(data, filepath):
         json.dump(data, f, indent=4)
 
 
+def _require_cv2():
+    if cv2 is None:
+        raise ImportError(
+            "OpenCV (cv2) is required for image rendering operations. "
+            "Install opencv-python and system graphics libraries such as libGL."
+        )
+
+
 def draw_boxes(image, boxes, labels, scores=None):
+    _require_cv2()
     # Simple visualization helper
     for i, box in enumerate(boxes):
         x1, y1, x2, y2 = map(int, box)
@@ -40,4 +54,5 @@ def draw_boxes(image, boxes, labels, scores=None):
 
 
 def save_image(image, filepath):
+    _require_cv2()
     cv2.imwrite(filepath, image)
