@@ -1,6 +1,5 @@
 import argparse
 import os
-from ultralytics import YOLO
 from src.utils.logger import logger
 
 
@@ -11,6 +10,8 @@ def export_model(model_path, format="onnx"):
     if not os.path.exists(model_path):
         logger.error(f"Model file not found at {model_path}")
         return None
+
+    from ultralytics import YOLO
 
     logger.info(f"Loading model from {model_path} for export to {format}...")
     model = YOLO(model_path)
