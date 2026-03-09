@@ -1,8 +1,4 @@
-import cv2
 import os
-import json
-import numpy as np
-from ultralytics import YOLO
 from src.utils.logger import logger
 from src.utils.helpers import save_json
 
@@ -13,6 +9,8 @@ class PCBDetector:
     """
 
     def __init__(self, model_path, deploy_config):
+        from ultralytics import YOLO
+
         self.model = YOLO(model_path)
         self.config = deploy_config
 

@@ -386,6 +386,19 @@ class PipelineUI(ctk.CTk):
 
         threading.Thread(target=worker, daemon=True).start()
 
+    def _require_inputs(self, phase_name, required_pairs):
+        missing = []
+        for label, value in required_pairs:
+            if not value:
+                missing.append(label)
+
+        if missing:
+            self.log_q.put(
+                f"\n[{phase_name} skipped: missing required input(s): {', '.join(missing)}]\n"
+            )
+            return False
+        return True
+
     def stop_proc(self):
         if self.proc and self.proc.poll() is None:
             self.proc.terminate()
@@ -395,6 +408,8 @@ class PipelineUI(ctk.CTk):
 
     def run_prepare(self):
         cfg = abs_path(self.prepare_config.get().strip(), self.repo_root)
+        if not self._require_inputs("prepare", [("config", cfg)]):
+            return
         cmd = ["pcb_yolo/scripts/prepare_dataset.py", "--config", cfg]
         if self.prepare_download.get():
             cmd.append("--download")
@@ -403,6 +418,8 @@ class PipelineUI(ctk.CTk):
 
     def run_train(self):
         cfg = abs_path(self.train_config.get().strip(), self.repo_root)
+        if not self._require_inputs("train", [("train config", cfg)]):
+            return
         seed = self.train_seed.get().strip() or "42"
         cmd = ["-m", "src.train", "--config", cfg, "--seed", seed]
         if self.train_deterministic.get():
@@ -426,6 +443,8 @@ class PipelineUI(ctk.CTk):
 
     def run_export(self):
         model = abs_path(self.export_model.get().strip(), self.repo_root)
+        if not self._require_inputs("export", [("model path", model)]):
+            return
         fmt = self.export_format.get().strip() or "onnx"
         cmd = ["-m", "src.export", "--model", model, "--format", fmt]
         self._save_state()
@@ -436,6 +455,16 @@ class PipelineUI(ctk.CTk):
         input_path = abs_path(self.deploy_input.get().strip(), self.repo_root)
         output_dir = abs_path(self.deploy_output.get().strip(), self.repo_root)
         cfg = abs_path(self.deploy_config.get().strip(), self.repo_root)
+        if not self._require_inputs(
+            "deploy",
+            [
+                ("model path", model),
+                ("input", input_path),
+                ("output dir", output_dir),
+                ("deploy config", cfg),
+            ],
+        ):
+            return
         cmd = [
             "-m",
             "src.inference.detector",
