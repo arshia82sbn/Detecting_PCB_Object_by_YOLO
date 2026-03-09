@@ -61,6 +61,19 @@ python -m src.export --model experiments/pcb_train/model.pt --format onnx
 python -m src.inference.detector --model experiments/pcb_train/model.pt --input data/mock/test/images --output experiments/test_predictions
 ```
 
+
+### GUI (CustomTkinter)
+A desktop GUI is available for the same 4 phases:
+1. Prepare dataset
+2. Train
+3. Export
+4. Deploy / inference
+
+Run it from repository root:
+```bash
+python ui/pcb_ui.py
+```
+
 ## Testing
 ```bash
 cd pcb_yolo
