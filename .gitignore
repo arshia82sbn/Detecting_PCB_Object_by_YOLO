@@ -1,18 +1,27 @@
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
+*.pyo
+*.pyd
+.pytest_cache/
+pytest-cache-files-*/
+**/.pytest_cache/
+
+# Virtual environments
+venv/
 .venv/
 env/
-venv/
 ENV/
+image_process/
 
-# Experiments and artifacts
-# We want to keep some results in the repo for review as requested,
-# but usually these are ignored.
-# For this task, we explicitly include some.
+# Build / packaging
+build/
+dist/
+*.egg-info/
 
-# Logs
-*.log
+# VSCode
+.vscode/
 
-# OS files
+# OS
 .DS_Store
+Thumbs.db

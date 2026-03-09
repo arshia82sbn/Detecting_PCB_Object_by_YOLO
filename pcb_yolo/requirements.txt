@@ -10,3 +10,4 @@ torch
 torchvision
 roboflow
 supervision
+customtkinter
