@@ -11,6 +11,15 @@ import customtkinter as ctk
 
 
 APP_TITLE = "PCB YOLO Pipeline"
+APP_SUBTITLE = "Visual setup and one-click runs for dataset, training, export, and inference"
+APP_VERSION = "v1.2"
+
+ACCENT = "#2d7ff9"
+ACCENT_DARK = "#1f5fc6"
+DANGER = "#b23b3b"
+CARD_BG = "#1b1f27"
+CARD_BG_LIGHT = "#f4f6fb"
+TEXT_MUTED = "#9aa4b2"
 
 
 def find_python_exe(root):
@@ -30,7 +39,7 @@ class PipelineUI(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title(APP_TITLE)
-        self.geometry("1200x720")
+        self.geometry("1260x760")
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("dark-blue")
 
@@ -41,6 +50,9 @@ class PipelineUI(ctk.CTk):
         self.proc = None
         self.last_exit_code = None
         self.log_q = queue.Queue()
+        self.active_step = None
+        self.active_steps = []
+        self.completed_steps = 0
 
         self._build_layout()
         self._load_state()
@@ -52,46 +64,92 @@ class PipelineUI(ctk.CTk):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        sidebar = ctk.CTkFrame(self, width=260)
+        sidebar = ctk.CTkFrame(self, width=280, corner_radius=12)
         sidebar.grid(row=0, column=0, sticky="nsw")
-        sidebar.grid_rowconfigure(10, weight=1)
+        sidebar.grid_rowconfigure(18, weight=1)
 
+        brand = ctk.CTkFrame(sidebar, corner_radius=12, fg_color=CARD_BG)
+        brand.grid(row=0, column=0, padx=16, pady=(18, 10), sticky="ew")
+        brand.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
-            sidebar, text="PCB YOLO", font=ctk.CTkFont(size=20, weight="bold")
-        ).grid(row=0, column=0, padx=16, pady=(16, 6), sticky="w")
+            brand, text="PCB YOLO", font=ctk.CTkFont(size=22, weight="bold")
+        ).grid(row=0, column=0, padx=14, pady=(12, 2), sticky="w")
         ctk.CTkLabel(
-            sidebar, text="Pipeline Launcher", font=ctk.CTkFont(size=12)
-        ).grid(row=1, column=0, padx=16, pady=(0, 12), sticky="w")
+            brand, text="Defect Detection Suite", font=ctk.CTkFont(size=12), text_color=TEXT_MUTED
+        ).grid(row=1, column=0, padx=14, pady=(0, 6), sticky="w")
+        ctk.CTkLabel(
+            brand, text=f"{APP_SUBTITLE}  |  {APP_VERSION}", font=ctk.CTkFont(size=10), text_color=TEXT_MUTED, wraplength=220
+        ).grid(row=2, column=0, padx=14, pady=(0, 12), sticky="w")
 
         self.btn_run_all = ctk.CTkButton(
-            sidebar, text="Run Full Pipeline", command=self.run_full_pipeline
+            sidebar,
+            text="Run Full Pipeline >>",
+            fg_color=ACCENT,
+            hover_color=ACCENT_DARK,
+            command=self.run_full_pipeline,
         )
-        self.btn_run_all.grid(row=2, column=0, padx=16, pady=(0, 8), sticky="ew")
+        self.btn_run_all.grid(row=1, column=0, padx=18, pady=(0, 8), sticky="ew")
 
         self.btn_stop = ctk.CTkButton(
-            sidebar, text="Stop Current", fg_color="#7a2e2e", command=self.stop_proc
+            sidebar,
+            text="Stop Current !!",
+            fg_color=DANGER,
+            hover_color="#8f2f2f",
+            command=self.stop_proc,
         )
-        self.btn_stop.grid(row=3, column=0, padx=16, pady=(0, 8), sticky="ew")
+        self.btn_stop.grid(row=2, column=0, padx=18, pady=(0, 12), sticky="ew")
+
+        self.btn_wizard = ctk.CTkButton(
+            sidebar,
+            text="Guided Setup >>",
+            border_width=1,
+            fg_color="transparent",
+            text_color=ACCENT,
+            hover_color="#1a2538",
+            command=self.open_setup_wizard,
+        )
+        self.btn_wizard.grid(row=3, column=0, padx=18, pady=(0, 16), sticky="ew")
 
         ctk.CTkLabel(
             sidebar, text="Python", font=ctk.CTkFont(size=12, weight="bold")
-        ).grid(row=4, column=0, padx=16, pady=(16, 4), sticky="w")
-        self.python_entry = ctk.CTkEntry(sidebar)
-        self.python_entry.grid(row=5, column=0, padx=16, pady=(0, 8), sticky="ew")
+        ).grid(row=4, column=0, padx=18, pady=(2, 4), sticky="w")
+        self.python_entry = ctk.CTkEntry(sidebar, placeholder_text="Path to python.exe")
+        self.python_entry.grid(row=5, column=0, padx=18, pady=(0, 8), sticky="ew")
+
+        self.pipeline_progress = ctk.CTkProgressBar(sidebar)
+        self.pipeline_progress.set(0)
+        self.pipeline_progress.grid(row=6, column=0, padx=18, pady=(6, 2), sticky="ew")
+        self.pipeline_progress_label = ctk.CTkLabel(
+            sidebar, text="Pipeline progress: 0/0", font=ctk.CTkFont(size=11), text_color=TEXT_MUTED
+        )
+        self.pipeline_progress_label.grid(row=7, column=0, padx=18, pady=(0, 8), sticky="w")
+
+        self.run_progress = ctk.CTkProgressBar(sidebar)
+        self.run_progress.set(0)
+        self.run_progress.grid(row=8, column=0, padx=18, pady=(2, 2), sticky="ew")
+        self.run_progress_label = ctk.CTkLabel(
+            sidebar, text="Step status: idle", font=ctk.CTkFont(size=11), text_color=TEXT_MUTED
+        )
+        self.run_progress_label.grid(row=9, column=0, padx=18, pady=(0, 6), sticky="w")
+
+        self.theme_toggle = ctk.CTkSwitch(
+            sidebar, text="Light Mode", command=self.toggle_theme
+        )
+        self.theme_toggle.grid(row=10, column=0, padx=18, pady=(2, 12), sticky="w")
 
         ctk.CTkLabel(
             sidebar, text="Logs", font=ctk.CTkFont(size=12, weight="bold")
-        ).grid(row=6, column=0, padx=16, pady=(16, 4), sticky="w")
-        self.log_box = ctk.CTkTextbox(sidebar, height=160)
-        self.log_box.grid(row=7, column=0, padx=16, pady=(0, 12), sticky="ew")
+        ).grid(row=11, column=0, padx=18, pady=(6, 4), sticky="w")
+        self.log_box = ctk.CTkTextbox(sidebar, height=180)
+        self.log_box.grid(row=12, column=0, padx=18, pady=(0, 12), sticky="ew")
         self.log_box.configure(state="disabled")
 
         self.status_label = ctk.CTkLabel(
             sidebar, text="Idle", font=ctk.CTkFont(size=12)
         )
-        self.status_label.grid(row=8, column=0, padx=16, pady=(8, 16), sticky="w")
+        self.status_label.grid(row=13, column=0, padx=18, pady=(8, 16), sticky="w")
 
-        main = ctk.CTkTabview(self)
+        main = ctk.CTkTabview(self, corner_radius=14)
         main.grid(row=0, column=1, sticky="nsew", padx=16, pady=16)
 
         self.tab_pipeline = main.add("Pipeline")
@@ -113,112 +171,152 @@ class PipelineUI(ctk.CTk):
         frame.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
-            frame, text="Full Pipeline", font=ctk.CTkFont(size=18, weight="bold")
-        ).grid(row=0, column=0, padx=16, pady=(16, 8), sticky="w")
+            frame, text="Full Pipeline", font=ctk.CTkFont(size=20, weight="bold")
+        ).grid(row=0, column=0, padx=18, pady=(18, 8), sticky="w")
+        ctk.CTkLabel(
+            frame,
+            text="Select the steps you want to run. Steps execute in order.",
+            font=ctk.CTkFont(size=12),
+            text_color=TEXT_MUTED,
+        ).grid(row=1, column=0, padx=18, pady=(0, 12), sticky="w")
+
+        status_card = ctk.CTkFrame(frame, corner_radius=12, fg_color=CARD_BG)
+        status_card.grid(row=2, column=0, padx=18, pady=(0, 12), sticky="ew")
+        status_card.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(
+            status_card, text="Status Board", font=ctk.CTkFont(size=13, weight="bold")
+        ).grid(row=0, column=0, columnspan=2, padx=12, pady=(10, 8), sticky="w")
+
+        self.step_status_labels = {}
+        for idx, name in enumerate(["Prepare", "Train", "Export", "Deploy"]):
+            ctk.CTkLabel(status_card, text=f"{name}:", text_color=TEXT_MUTED).grid(
+                row=idx + 1, column=0, padx=12, pady=4, sticky="w"
+            )
+            label = ctk.CTkLabel(status_card, text="Idle")
+            label.grid(row=idx + 1, column=1, padx=12, pady=4, sticky="w")
+            self.step_status_labels[name.lower()] = label
 
         self.chk_prepare = ctk.CTkCheckBox(frame, text="1) Prepare dataset")
         self.chk_prepare.select()
-        self.chk_prepare.grid(row=1, column=0, padx=16, pady=6, sticky="w")
+        self.chk_prepare.grid(row=3, column=0, padx=18, pady=6, sticky="w")
 
         self.chk_train = ctk.CTkCheckBox(frame, text="2) Train model")
         self.chk_train.select()
-        self.chk_train.grid(row=2, column=0, padx=16, pady=6, sticky="w")
+        self.chk_train.grid(row=4, column=0, padx=18, pady=6, sticky="w")
 
         self.chk_export = ctk.CTkCheckBox(frame, text="3) Export model")
         self.chk_export.select()
-        self.chk_export.grid(row=3, column=0, padx=16, pady=6, sticky="w")
+        self.chk_export.grid(row=5, column=0, padx=18, pady=6, sticky="w")
 
         self.chk_deploy = ctk.CTkCheckBox(frame, text="4) Deploy / Inference")
         self.chk_deploy.select()
-        self.chk_deploy.grid(row=4, column=0, padx=16, pady=6, sticky="w")
+        self.chk_deploy.grid(row=6, column=0, padx=18, pady=6, sticky="w")
 
         self.auto_delete_after_train = ctk.CTkCheckBox(
             frame,
             text="Delete dataset after successful training (model must exist)",
         )
         self.auto_delete_after_train.grid(
-            row=5, column=0, padx=16, pady=6, sticky="w"
+            row=7, column=0, padx=18, pady=6, sticky="w"
         )
 
         ctk.CTkButton(
             frame, text="Run Selected Steps", command=self.run_full_pipeline
-        ).grid(row=6, column=0, padx=16, pady=(12, 8), sticky="w")
+        ).grid(row=8, column=0, padx=18, pady=(12, 8), sticky="w")
 
     def _build_prepare_tab(self):
         frame = self.tab_prepare
         frame.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(
-            frame, text="Prepare Dataset", font=ctk.CTkFont(size=18, weight="bold")
-        ).grid(row=0, column=0, columnspan=2, padx=16, pady=(16, 8), sticky="w")
+            frame, text="Prepare Dataset", font=ctk.CTkFont(size=20, weight="bold")
+        ).grid(row=0, column=0, columnspan=2, padx=18, pady=(18, 4), sticky="w")
+        ctk.CTkLabel(
+            frame,
+            text="Use a local dataset or download from Roboflow with your API key.",
+            font=ctk.CTkFont(size=12),
+            text_color=TEXT_MUTED,
+        ).grid(row=1, column=0, columnspan=2, padx=18, pady=(0, 12), sticky="w")
 
         ctk.CTkLabel(frame, text="Config").grid(
-            row=1, column=0, padx=16, pady=6, sticky="w"
+            row=2, column=0, padx=18, pady=6, sticky="w"
         )
-        self.prepare_config = ctk.CTkEntry(frame)
-        self.prepare_config.grid(row=1, column=1, padx=16, pady=6, sticky="ew")
+        self.prepare_config = ctk.CTkEntry(frame, placeholder_text="pcb_yolo/configs/data_config.yaml")
+        self.prepare_config.grid(row=2, column=1, padx=18, pady=6, sticky="ew")
         ctk.CTkButton(
             frame, text="Browse", command=lambda: self._browse_file(self.prepare_config)
-        ).grid(row=1, column=2, padx=8, pady=6, sticky="w")
+        ).grid(row=2, column=2, padx=8, pady=6, sticky="w")
 
         self.prepare_download = ctk.CTkCheckBox(frame, text="Download from Roboflow")
-        self.prepare_download.grid(row=2, column=1, padx=16, pady=6, sticky="w")
+        self.prepare_download.grid(row=3, column=1, padx=18, pady=6, sticky="w")
 
         ctk.CTkLabel(frame, text="Dataset dir").grid(
-            row=3, column=0, padx=16, pady=6, sticky="w"
+            row=4, column=0, padx=18, pady=6, sticky="w"
         )
-        self.dataset_dir = ctk.CTkEntry(frame)
-        self.dataset_dir.grid(row=3, column=1, padx=16, pady=6, sticky="ew")
+        self.dataset_dir = ctk.CTkEntry(frame, placeholder_text="Detecting-the-PCB-object-3")
+        self.dataset_dir.grid(row=4, column=1, padx=18, pady=6, sticky="ew")
         ctk.CTkButton(
             frame, text="Browse", command=lambda: self._browse_dir(self.dataset_dir)
-        ).grid(row=3, column=2, padx=8, pady=6, sticky="w")
+        ).grid(row=4, column=2, padx=8, pady=6, sticky="w")
+
+        self.prepare_status = ctk.CTkLabel(frame, text="Status: Idle", text_color=TEXT_MUTED)
+        self.prepare_status.grid(row=5, column=0, padx=18, pady=(6, 6), sticky="w")
 
         ctk.CTkButton(frame, text="Run Prepare", command=self.run_prepare).grid(
-            row=4, column=1, padx=16, pady=12, sticky="w"
+            row=5, column=1, padx=18, pady=12, sticky="w"
         )
 
         ctk.CTkButton(
-            frame, text="Delete Dataset", fg_color="#7a2e2e", command=self.delete_dataset
-        ).grid(row=5, column=1, padx=16, pady=(0, 12), sticky="w")
+            frame, text="Delete Dataset", fg_color=DANGER, hover_color="#8f2f2f", command=self.delete_dataset
+        ).grid(row=6, column=1, padx=18, pady=(0, 12), sticky="w")
 
     def _build_train_tab(self):
         frame = self.tab_train
         frame.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(
-            frame, text="Train Model", font=ctk.CTkFont(size=18, weight="bold")
-        ).grid(row=0, column=0, columnspan=2, padx=16, pady=(16, 8), sticky="w")
+            frame, text="Train Model", font=ctk.CTkFont(size=20, weight="bold")
+        ).grid(row=0, column=0, columnspan=2, padx=18, pady=(18, 4), sticky="w")
+        ctk.CTkLabel(
+            frame,
+            text="Run training with a config file and optional deterministic mode.",
+            font=ctk.CTkFont(size=12),
+            text_color=TEXT_MUTED,
+        ).grid(row=1, column=0, columnspan=2, padx=18, pady=(0, 12), sticky="w")
 
         ctk.CTkLabel(frame, text="Train config").grid(
-            row=1, column=0, padx=16, pady=6, sticky="w"
+            row=2, column=0, padx=18, pady=6, sticky="w"
         )
-        self.train_config = ctk.CTkEntry(frame)
-        self.train_config.grid(row=1, column=1, padx=16, pady=6, sticky="ew")
+        self.train_config = ctk.CTkEntry(frame, placeholder_text="pcb_yolo/configs/train_config.yaml")
+        self.train_config.grid(row=2, column=1, padx=18, pady=6, sticky="ew")
         ctk.CTkButton(
             frame, text="Browse", command=lambda: self._browse_file(self.train_config)
-        ).grid(row=1, column=2, padx=8, pady=6, sticky="w")
+        ).grid(row=2, column=2, padx=8, pady=6, sticky="w")
 
         ctk.CTkLabel(frame, text="Seed").grid(
-            row=2, column=0, padx=16, pady=6, sticky="w"
+            row=3, column=0, padx=18, pady=6, sticky="w"
         )
         self.train_seed = ctk.CTkEntry(frame, width=120)
-        self.train_seed.grid(row=2, column=1, padx=16, pady=6, sticky="w")
+        self.train_seed.grid(row=3, column=1, padx=18, pady=6, sticky="w")
 
         self.train_deterministic = ctk.CTkCheckBox(frame, text="Deterministic")
         self.train_deterministic.select()
-        self.train_deterministic.grid(row=3, column=1, padx=16, pady=6, sticky="w")
+        self.train_deterministic.grid(row=4, column=1, padx=18, pady=6, sticky="w")
 
         ctk.CTkLabel(frame, text="Expected model path").grid(
-            row=4, column=0, padx=16, pady=6, sticky="w"
+            row=5, column=0, padx=18, pady=6, sticky="w"
         )
-        self.model_path = ctk.CTkEntry(frame)
-        self.model_path.grid(row=4, column=1, padx=16, pady=6, sticky="ew")
+        self.model_path = ctk.CTkEntry(frame, placeholder_text="pcb_yolo/experiments/pcb_train/weights/best.pt")
+        self.model_path.grid(row=5, column=1, padx=18, pady=6, sticky="ew")
         ctk.CTkButton(
             frame, text="Browse", command=lambda: self._browse_file(self.model_path)
-        ).grid(row=4, column=2, padx=8, pady=6, sticky="w")
+        ).grid(row=5, column=2, padx=8, pady=6, sticky="w")
+
+        self.train_status = ctk.CTkLabel(frame, text="Status: Idle", text_color=TEXT_MUTED)
+        self.train_status.grid(row=6, column=0, padx=18, pady=(6, 6), sticky="w")
 
         ctk.CTkButton(frame, text="Run Train", command=self.run_train).grid(
-            row=5, column=1, padx=16, pady=12, sticky="w"
+            row=6, column=1, padx=18, pady=12, sticky="w"
         )
 
     def _build_export_tab(self):
@@ -226,27 +324,36 @@ class PipelineUI(ctk.CTk):
         frame.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(
-            frame, text="Export Model", font=ctk.CTkFont(size=18, weight="bold")
-        ).grid(row=0, column=0, columnspan=2, padx=16, pady=(16, 8), sticky="w")
+            frame, text="Export Model", font=ctk.CTkFont(size=20, weight="bold")
+        ).grid(row=0, column=0, columnspan=2, padx=18, pady=(18, 4), sticky="w")
+        ctk.CTkLabel(
+            frame,
+            text="Convert the trained model for deployment formats.",
+            font=ctk.CTkFont(size=12),
+            text_color=TEXT_MUTED,
+        ).grid(row=1, column=0, columnspan=2, padx=18, pady=(0, 12), sticky="w")
 
         ctk.CTkLabel(frame, text="Model path").grid(
-            row=1, column=0, padx=16, pady=6, sticky="w"
+            row=2, column=0, padx=18, pady=6, sticky="w"
         )
-        self.export_model = ctk.CTkEntry(frame)
-        self.export_model.grid(row=1, column=1, padx=16, pady=6, sticky="ew")
+        self.export_model = ctk.CTkEntry(frame, placeholder_text="pcb_yolo/experiments/pcb_train/weights/best.pt")
+        self.export_model.grid(row=2, column=1, padx=18, pady=6, sticky="ew")
         ctk.CTkButton(
             frame, text="Browse", command=lambda: self._browse_file(self.export_model)
-        ).grid(row=1, column=2, padx=8, pady=6, sticky="w")
+        ).grid(row=2, column=2, padx=8, pady=6, sticky="w")
 
         ctk.CTkLabel(frame, text="Format").grid(
-            row=2, column=0, padx=16, pady=6, sticky="w"
+            row=3, column=0, padx=18, pady=6, sticky="w"
         )
         self.export_format = ctk.CTkComboBox(frame, values=["onnx", "torchscript"])
         self.export_format.set("onnx")
-        self.export_format.grid(row=2, column=1, padx=16, pady=6, sticky="w")
+        self.export_format.grid(row=3, column=1, padx=18, pady=6, sticky="w")
+
+        self.export_status = ctk.CTkLabel(frame, text="Status: Idle", text_color=TEXT_MUTED)
+        self.export_status.grid(row=4, column=0, padx=18, pady=(6, 6), sticky="w")
 
         ctk.CTkButton(frame, text="Run Export", command=self.run_export).grid(
-            row=3, column=1, padx=16, pady=12, sticky="w"
+            row=4, column=1, padx=18, pady=12, sticky="w"
         )
 
     def _build_deploy_tab(self):
@@ -254,47 +361,56 @@ class PipelineUI(ctk.CTk):
         frame.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(
-            frame, text="Deploy / Inference", font=ctk.CTkFont(size=18, weight="bold")
-        ).grid(row=0, column=0, columnspan=2, padx=16, pady=(16, 8), sticky="w")
+            frame, text="Deploy / Inference", font=ctk.CTkFont(size=20, weight="bold")
+        ).grid(row=0, column=0, columnspan=2, padx=18, pady=(18, 4), sticky="w")
+        ctk.CTkLabel(
+            frame,
+            text="Run predictions on images or folders and save outputs.",
+            font=ctk.CTkFont(size=12),
+            text_color=TEXT_MUTED,
+        ).grid(row=1, column=0, columnspan=2, padx=18, pady=(0, 12), sticky="w")
 
         ctk.CTkLabel(frame, text="Model path").grid(
-            row=1, column=0, padx=16, pady=6, sticky="w"
+            row=2, column=0, padx=18, pady=6, sticky="w"
         )
-        self.deploy_model = ctk.CTkEntry(frame)
-        self.deploy_model.grid(row=1, column=1, padx=16, pady=6, sticky="ew")
+        self.deploy_model = ctk.CTkEntry(frame, placeholder_text="pcb_yolo/experiments/pcb_train/weights/best.pt")
+        self.deploy_model.grid(row=2, column=1, padx=18, pady=6, sticky="ew")
         ctk.CTkButton(
             frame, text="Browse", command=lambda: self._browse_file(self.deploy_model)
-        ).grid(row=1, column=2, padx=8, pady=6, sticky="w")
-
-        ctk.CTkLabel(frame, text="Input").grid(
-            row=2, column=0, padx=16, pady=6, sticky="w"
-        )
-        self.deploy_input = ctk.CTkEntry(frame)
-        self.deploy_input.grid(row=2, column=1, padx=16, pady=6, sticky="ew")
-        ctk.CTkButton(
-            frame, text="Browse", command=lambda: self._browse_input(self.deploy_input)
         ).grid(row=2, column=2, padx=8, pady=6, sticky="w")
 
-        ctk.CTkLabel(frame, text="Output dir").grid(
-            row=3, column=0, padx=16, pady=6, sticky="w"
+        ctk.CTkLabel(frame, text="Input").grid(
+            row=3, column=0, padx=18, pady=6, sticky="w"
         )
-        self.deploy_output = ctk.CTkEntry(frame)
-        self.deploy_output.grid(row=3, column=1, padx=16, pady=6, sticky="ew")
+        self.deploy_input = ctk.CTkEntry(frame, placeholder_text="data/mock/test/images")
+        self.deploy_input.grid(row=3, column=1, padx=18, pady=6, sticky="ew")
         ctk.CTkButton(
-            frame, text="Browse", command=lambda: self._browse_dir(self.deploy_output)
+            frame, text="Browse", command=lambda: self._browse_input(self.deploy_input)
         ).grid(row=3, column=2, padx=8, pady=6, sticky="w")
 
-        ctk.CTkLabel(frame, text="Deploy config").grid(
-            row=4, column=0, padx=16, pady=6, sticky="w"
+        ctk.CTkLabel(frame, text="Output dir").grid(
+            row=4, column=0, padx=18, pady=6, sticky="w"
         )
-        self.deploy_config = ctk.CTkEntry(frame)
-        self.deploy_config.grid(row=4, column=1, padx=16, pady=6, sticky="ew")
+        self.deploy_output = ctk.CTkEntry(frame, placeholder_text="pcb_yolo/experiments/predictions")
+        self.deploy_output.grid(row=4, column=1, padx=18, pady=6, sticky="ew")
         ctk.CTkButton(
-            frame, text="Browse", command=lambda: self._browse_file(self.deploy_config)
+            frame, text="Browse", command=lambda: self._browse_dir(self.deploy_output)
         ).grid(row=4, column=2, padx=8, pady=6, sticky="w")
 
+        ctk.CTkLabel(frame, text="Deploy config").grid(
+            row=5, column=0, padx=18, pady=6, sticky="w"
+        )
+        self.deploy_config = ctk.CTkEntry(frame, placeholder_text="pcb_yolo/configs/deploy_config.yaml")
+        self.deploy_config.grid(row=5, column=1, padx=18, pady=6, sticky="ew")
+        ctk.CTkButton(
+            frame, text="Browse", command=lambda: self._browse_file(self.deploy_config)
+        ).grid(row=5, column=2, padx=8, pady=6, sticky="w")
+
+        self.deploy_status = ctk.CTkLabel(frame, text="Status: Idle", text_color=TEXT_MUTED)
+        self.deploy_status.grid(row=6, column=0, padx=18, pady=(6, 6), sticky="w")
+
         ctk.CTkButton(frame, text="Run Deploy", command=self.run_deploy).grid(
-            row=5, column=1, padx=16, pady=12, sticky="w"
+            row=6, column=1, padx=18, pady=12, sticky="w"
         )
 
     def _build_settings_tab(self):
@@ -302,8 +418,8 @@ class PipelineUI(ctk.CTk):
         frame.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
-            frame, text="Settings", font=ctk.CTkFont(size=18, weight="bold")
-        ).grid(row=0, column=0, padx=16, pady=(16, 8), sticky="w")
+            frame, text="Settings", font=ctk.CTkFont(size=20, weight="bold")
+        ).grid(row=0, column=0, padx=18, pady=(18, 4), sticky="w")
 
         note = (
             "This UI runs your existing CLI pipeline from pcb_yolo.\n"
@@ -311,7 +427,7 @@ class PipelineUI(ctk.CTk):
             "ONNX export requires: onnx, onnxslim, onnxruntime or onnxruntime-gpu."
         )
         ctk.CTkLabel(frame, text=note, justify="left").grid(
-            row=1, column=0, padx=16, pady=8, sticky="w"
+            row=1, column=0, padx=18, pady=8, sticky="w"
         )
 
     def _browse_file(self, entry):
@@ -356,6 +472,11 @@ class PipelineUI(ctk.CTk):
         full_cmd = [python_exe] + cmd
         self._append_log(f"\n$ {' '.join(full_cmd)}\n")
         self.status_label.configure(text=f"Running: {label}")
+        self.active_step = label.lower()
+        self._set_step_status(self.active_step, "Running")
+        self.run_progress.configure(mode="indeterminate")
+        self.run_progress.start()
+        self.run_progress_label.configure(text=f"Step status: running {label}")
         self.last_exit_code = None
 
         def worker():
@@ -381,6 +502,15 @@ class PipelineUI(ctk.CTk):
             self.last_exit_code = code
             self.log_q.put(f"\n[exit code {code}]\n")
             self.status_label.configure(text="Idle")
+            self.run_progress.stop()
+            self.run_progress.set(0)
+            if code == 0:
+                self._set_step_status(self.active_step, "Success")
+                self.completed_steps += 1
+            else:
+                self._set_step_status(self.active_step, "Failed")
+            self._update_pipeline_progress()
+            self.run_progress_label.configure(text="Step status: idle")
             if on_done:
                 on_done(code)
 
@@ -403,6 +533,11 @@ class PipelineUI(ctk.CTk):
         if self.proc and self.proc.poll() is None:
             self.proc.terminate()
             self._append_log("\n[process terminated]\n")
+            if self.active_step:
+                self._set_step_status(self.active_step, "Stopped")
+            self.run_progress.stop()
+            self.run_progress.set(0)
+            self.run_progress_label.configure(text="Step status: idle")
         else:
             self._append_log("\n[no active process]\n")
 
@@ -494,6 +629,10 @@ class PipelineUI(ctk.CTk):
             self.log_q.put("\n[no steps selected]\n")
             return
 
+        self.active_steps = [fn.__name__.replace("run_", "") for fn in steps]
+        self.completed_steps = 0
+        self._update_pipeline_progress()
+
         def sequence():
             for step in steps:
                 self.after(0, step)
@@ -565,6 +704,11 @@ class PipelineUI(ctk.CTk):
         if defaults["auto_delete_after_train"]:
             self.auto_delete_after_train.select()
 
+        if ctk.get_appearance_mode().lower() == "light":
+            self.theme_toggle.select()
+
+        self._update_pipeline_progress()
+
     def _save_state(self):
         state = {
             "python": self.python_entry.get().strip(),
@@ -588,6 +732,207 @@ class PipelineUI(ctk.CTk):
                 json.dump(state, f, indent=2)
         except Exception:
             pass
+
+    def toggle_theme(self):
+        is_light = bool(self.theme_toggle.get())
+        ctk.set_appearance_mode("light" if is_light else "dark")
+
+    def _set_step_status(self, step_key, status):
+        if not step_key:
+            return
+        label = self.step_status_labels.get(step_key)
+        if label:
+            label.configure(text=status)
+        if step_key == "prepare":
+            self.prepare_status.configure(text=f"Status: {status}")
+        elif step_key == "train":
+            self.train_status.configure(text=f"Status: {status}")
+        elif step_key == "export":
+            self.export_status.configure(text=f"Status: {status}")
+        elif step_key == "deploy":
+            self.deploy_status.configure(text=f"Status: {status}")
+
+    def _update_pipeline_progress(self):
+        total = len(self.active_steps) if self.active_steps else 0
+        self.pipeline_progress_label.configure(text=f"Pipeline progress: {self.completed_steps}/{total}")
+        if total == 0:
+            self.pipeline_progress.set(0)
+        else:
+            self.pipeline_progress.set(min(1, self.completed_steps / total))
+
+    def open_setup_wizard(self):
+        wizard = ctk.CTkToplevel(self)
+        wizard.title("Guided Setup")
+        wizard.geometry("700x520")
+        wizard.grab_set()
+        wizard.grid_columnconfigure(0, weight=1)
+        wizard.grid_rowconfigure(1, weight=1)
+
+        header = ctk.CTkFrame(wizard, fg_color=CARD_BG, corner_radius=12)
+        header.grid(row=0, column=0, padx=16, pady=16, sticky="ew")
+        header.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            header, text="Guided Setup", font=ctk.CTkFont(size=18, weight="bold")
+        ).grid(row=0, column=0, padx=14, pady=(10, 2), sticky="w")
+        ctk.CTkLabel(
+            header,
+            text="Follow the steps and click Finish to apply settings.",
+            font=ctk.CTkFont(size=12),
+            text_color=TEXT_MUTED,
+        ).grid(row=1, column=0, padx=14, pady=(0, 10), sticky="w")
+
+        container = ctk.CTkFrame(wizard, corner_radius=12)
+        container.grid(row=1, column=0, padx=16, pady=(0, 16), sticky="nsew")
+        container.grid_columnconfigure(0, weight=1)
+        container.grid_rowconfigure(0, weight=1)
+
+        steps = []
+
+        def add_step(title):
+            step = ctk.CTkFrame(container, corner_radius=12)
+            step.grid(row=0, column=0, sticky="nsew")
+            step.grid_columnconfigure(1, weight=1)
+            ctk.CTkLabel(step, text=title, font=ctk.CTkFont(size=16, weight="bold")).grid(
+                row=0, column=0, columnspan=2, padx=16, pady=(16, 10), sticky="w"
+            )
+            steps.append(step)
+            return step
+
+        step1 = add_step("Step 1: Python Environment")
+        ctk.CTkLabel(step1, text="Python path").grid(row=1, column=0, padx=16, pady=6, sticky="w")
+        wizard_python = ctk.CTkEntry(step1)
+        wizard_python.grid(row=1, column=1, padx=16, pady=6, sticky="ew")
+        wizard_python.insert(0, self.python_entry.get().strip())
+        ctk.CTkButton(step1, text="Auto-detect", command=lambda: wizard_python.delete(0, "end") or wizard_python.insert(0, find_python_exe(self.repo_root))).grid(
+            row=2, column=1, padx=16, pady=6, sticky="w"
+        )
+
+        step2 = add_step("Step 2: Prepare Dataset")
+        ctk.CTkLabel(step2, text="Config").grid(row=1, column=0, padx=16, pady=6, sticky="w")
+        wizard_prepare_config = ctk.CTkEntry(step2)
+        wizard_prepare_config.grid(row=1, column=1, padx=16, pady=6, sticky="ew")
+        wizard_prepare_config.insert(0, self.prepare_config.get().strip())
+        ctk.CTkButton(step2, text="Browse", command=lambda: self._browse_file(wizard_prepare_config)).grid(
+            row=1, column=2, padx=8, pady=6, sticky="w"
+        )
+        wizard_prepare_download = ctk.CTkCheckBox(step2, text="Download from Roboflow")
+        wizard_prepare_download.grid(row=2, column=1, padx=16, pady=6, sticky="w")
+        if self.prepare_download.get():
+            wizard_prepare_download.select()
+        ctk.CTkLabel(step2, text="Dataset dir").grid(row=3, column=0, padx=16, pady=6, sticky="w")
+        wizard_dataset_dir = ctk.CTkEntry(step2)
+        wizard_dataset_dir.grid(row=3, column=1, padx=16, pady=6, sticky="ew")
+        wizard_dataset_dir.insert(0, self.dataset_dir.get().strip())
+        ctk.CTkButton(step2, text="Browse", command=lambda: self._browse_dir(wizard_dataset_dir)).grid(
+            row=3, column=2, padx=8, pady=6, sticky="w"
+        )
+
+        step3 = add_step("Step 3: Train and Export")
+        ctk.CTkLabel(step3, text="Train config").grid(row=1, column=0, padx=16, pady=6, sticky="w")
+        wizard_train_config = ctk.CTkEntry(step3)
+        wizard_train_config.grid(row=1, column=1, padx=16, pady=6, sticky="ew")
+        wizard_train_config.insert(0, self.train_config.get().strip())
+        ctk.CTkButton(step3, text="Browse", command=lambda: self._browse_file(wizard_train_config)).grid(
+            row=1, column=2, padx=8, pady=6, sticky="w"
+        )
+        ctk.CTkLabel(step3, text="Seed").grid(row=2, column=0, padx=16, pady=6, sticky="w")
+        wizard_train_seed = ctk.CTkEntry(step3)
+        wizard_train_seed.grid(row=2, column=1, padx=16, pady=6, sticky="w")
+        wizard_train_seed.insert(0, self.train_seed.get().strip())
+        wizard_train_det = ctk.CTkCheckBox(step3, text="Deterministic")
+        wizard_train_det.grid(row=3, column=1, padx=16, pady=6, sticky="w")
+        if self.train_deterministic.get():
+            wizard_train_det.select()
+        ctk.CTkLabel(step3, text="Model path").grid(row=4, column=0, padx=16, pady=6, sticky="w")
+        wizard_model_path = ctk.CTkEntry(step3)
+        wizard_model_path.grid(row=4, column=1, padx=16, pady=6, sticky="ew")
+        wizard_model_path.insert(0, self.model_path.get().strip())
+        ctk.CTkButton(step3, text="Browse", command=lambda: self._browse_file(wizard_model_path)).grid(
+            row=4, column=2, padx=8, pady=6, sticky="w"
+        )
+
+        step4 = add_step("Step 4: Deploy / Inference")
+        ctk.CTkLabel(step4, text="Model path").grid(row=1, column=0, padx=16, pady=6, sticky="w")
+        wizard_deploy_model = ctk.CTkEntry(step4)
+        wizard_deploy_model.grid(row=1, column=1, padx=16, pady=6, sticky="ew")
+        wizard_deploy_model.insert(0, self.deploy_model.get().strip())
+        ctk.CTkButton(step4, text="Browse", command=lambda: self._browse_file(wizard_deploy_model)).grid(
+            row=1, column=2, padx=8, pady=6, sticky="w"
+        )
+        ctk.CTkLabel(step4, text="Input").grid(row=2, column=0, padx=16, pady=6, sticky="w")
+        wizard_deploy_input = ctk.CTkEntry(step4)
+        wizard_deploy_input.grid(row=2, column=1, padx=16, pady=6, sticky="ew")
+        wizard_deploy_input.insert(0, self.deploy_input.get().strip())
+        ctk.CTkButton(step4, text="Browse", command=lambda: self._browse_input(wizard_deploy_input)).grid(
+            row=2, column=2, padx=8, pady=6, sticky="w"
+        )
+        ctk.CTkLabel(step4, text="Output dir").grid(row=3, column=0, padx=16, pady=6, sticky="w")
+        wizard_deploy_output = ctk.CTkEntry(step4)
+        wizard_deploy_output.grid(row=3, column=1, padx=16, pady=6, sticky="ew")
+        wizard_deploy_output.insert(0, self.deploy_output.get().strip())
+        ctk.CTkButton(step4, text="Browse", command=lambda: self._browse_dir(wizard_deploy_output)).grid(
+            row=3, column=2, padx=8, pady=6, sticky="w"
+        )
+        ctk.CTkLabel(step4, text="Deploy config").grid(row=4, column=0, padx=16, pady=6, sticky="w")
+        wizard_deploy_config = ctk.CTkEntry(step4)
+        wizard_deploy_config.grid(row=4, column=1, padx=16, pady=6, sticky="ew")
+        wizard_deploy_config.insert(0, self.deploy_config.get().strip())
+        ctk.CTkButton(step4, text="Browse", command=lambda: self._browse_file(wizard_deploy_config)).grid(
+            row=4, column=2, padx=8, pady=6, sticky="w"
+        )
+
+        nav = ctk.CTkFrame(wizard)
+        nav.grid(row=2, column=0, padx=16, pady=(0, 16), sticky="ew")
+        nav.grid_columnconfigure(1, weight=1)
+        step_index = {"value": 0}
+
+        def show_step(index):
+            step_index["value"] = index
+            for i, s in enumerate(steps):
+                s.grid_remove()
+                if i == index:
+                    s.grid()
+            back_btn.configure(state="normal" if index > 0 else "disabled")
+            next_btn.configure(state="normal" if index < len(steps) - 1 else "disabled")
+
+        def apply_settings():
+            self.python_entry.delete(0, "end")
+            self.python_entry.insert(0, wizard_python.get().strip())
+            self.prepare_config.delete(0, "end")
+            self.prepare_config.insert(0, wizard_prepare_config.get().strip())
+            self.prepare_download.deselect()
+            if wizard_prepare_download.get():
+                self.prepare_download.select()
+            self.dataset_dir.delete(0, "end")
+            self.dataset_dir.insert(0, wizard_dataset_dir.get().strip())
+            self.train_config.delete(0, "end")
+            self.train_config.insert(0, wizard_train_config.get().strip())
+            self.train_seed.delete(0, "end")
+            self.train_seed.insert(0, wizard_train_seed.get().strip())
+            self.train_deterministic.deselect()
+            if wizard_train_det.get():
+                self.train_deterministic.select()
+            self.model_path.delete(0, "end")
+            self.model_path.insert(0, wizard_model_path.get().strip())
+            self.deploy_model.delete(0, "end")
+            self.deploy_model.insert(0, wizard_deploy_model.get().strip())
+            self.deploy_input.delete(0, "end")
+            self.deploy_input.insert(0, wizard_deploy_input.get().strip())
+            self.deploy_output.delete(0, "end")
+            self.deploy_output.insert(0, wizard_deploy_output.get().strip())
+            self.deploy_config.delete(0, "end")
+            self.deploy_config.insert(0, wizard_deploy_config.get().strip())
+            self._save_state()
+            wizard.destroy()
+
+        back_btn = ctk.CTkButton(nav, text="Back", command=lambda: show_step(step_index["value"] - 1))
+        back_btn.grid(row=0, column=0, padx=6, pady=6, sticky="w")
+        next_btn = ctk.CTkButton(nav, text="Next", command=lambda: show_step(step_index["value"] + 1))
+        next_btn.grid(row=0, column=1, padx=6, pady=6, sticky="e")
+        finish_btn = ctk.CTkButton(nav, text="Finish", fg_color=ACCENT, hover_color=ACCENT_DARK, command=apply_settings)
+        finish_btn.grid(row=0, column=2, padx=6, pady=6, sticky="e")
+
+        show_step(0)
 
     def _on_close(self):
         self._save_state()

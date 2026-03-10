@@ -1,0 +1,17 @@
+{
+  "python": "C:\\Users\\Arshia\\OneDrive\\Documents\\programming\\python\\image proccessing\\yolo PCB object detection\\image_process\\Scripts\\python.exe",
+  "prepare_config": "pcb_yolo/configs/data_config.yaml",
+  "prepare_download": true,
+  "dataset_dir": "Detecting-the-PCB-object-3",
+  "train_config": "pcb_yolo/configs/train_config.yaml",
+  "train_seed": "42",
+  "train_deterministic": true,
+  "model_path": "pcb_yolo/experiments/pcb_train/weights/best.pt",
+  "export_model": "pcb_yolo/experiments/pcb_train/weights/best.pt",
+  "export_format": "onnx",
+  "deploy_model": "pcb_yolo/experiments/pcb_train/weights/best.pt",
+  "deploy_input": "",
+  "deploy_output": "pcb_yolo/experiments/predictions",
+  "deploy_config": "pcb_yolo/configs/deploy_config.yaml",
+  "auto_delete_after_train": true
+}
